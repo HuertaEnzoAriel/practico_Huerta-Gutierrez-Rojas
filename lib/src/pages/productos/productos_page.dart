@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../../components/visorimagen_page.dart';
 import '../../models/producto.dart';
+import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
 class ProductosPage extends StatefulWidget {
@@ -12,19 +14,6 @@ class ProductosPage extends StatefulWidget {
 }
 
 class _ProductosPageState extends State<ProductosPage> {
-  Future<List<Producto>> futureProductos() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return [
-      Producto(id: '1', nombre: 'Producto 1', precio: 135060, imagen: ''),
-      Producto(id: '2', nombre: 'Producto 2', precio: 250000, imagen: ''),
-      Producto(id: '3', nombre: 'Producto 3', precio: 5862000, imagen: ''),
-    ];
-  }
-
-  Stream<List<Producto>> getProductos() async* {
-    yield await futureProductos();
-  }
-
   @override
   Widget build(BuildContext context) {
     final responsive = Responsive.of(context);
@@ -32,17 +21,14 @@ class _ProductosPageState extends State<ProductosPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Mis Productos'), elevation: 0),
       body: SafeArea(
-        child: StreamBuilder<List<Producto>>(
-          stream: getProductos(),
-          builder: (context, asyncSnapshot) {
-            if (asyncSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (asyncSnapshot.hasError) {
-              return _hasError(responsive, theme);
-            } else if (!asyncSnapshot.hasData || asyncSnapshot.data!.isEmpty) {
+        // Escucha la caja de productos: se redibuja sola cuando cambia
+        child: ValueListenableBuilder<Box<Producto>>(
+          valueListenable: HiveService.productos.listenable(),
+          builder: (context, box, _) {
+            final productos = box.values.toList();
+            if (productos.isEmpty) {
               return const Center(child: Text('No hay productos disponibles'));
             }
-            final productos = asyncSnapshot.data!;
             return _hasData(responsive, theme, productos);
           },
         ),
@@ -55,22 +41,6 @@ class _ProductosPageState extends State<ProductosPage> {
         label: const Text('Nuevo Producto'),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: Colors.white,
-      ),
-    );
-  }
-
-  Widget _hasError(Responsive responsive, ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
-          SizedBox(height: responsive.hp(2)),
-          Text(
-            'Error al cargar el catálogo',
-            style: TextStyle(color: theme.colorScheme.error),
-          ),
-        ],
       ),
     );
   }
