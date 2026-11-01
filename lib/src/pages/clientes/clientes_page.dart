@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../../models/cliente.dart';
+import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
 class ClientesPage extends StatefulWidget {
@@ -11,19 +13,6 @@ class ClientesPage extends StatefulWidget {
 }
 
 class _ClientesPageState extends State<ClientesPage> {
-  Future<List<Cliente>> futureClientes() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return [
-      Cliente(id: '1', nombre: 'Cliente 1', telefono: '1111111111'),
-      Cliente(id: '2', nombre: 'Cliente 2', telefono: '1111111111'),
-      Cliente(id: '3', nombre: 'Cliente 3', telefono: '1111111111'),
-    ];
-  }
-
-  Stream<List<Cliente>> getClientes() async* {
-    yield await futureClientes();
-  }
-
   @override
   Widget build(BuildContext context) {
     final responsive = Responsive.of(context);
@@ -32,18 +21,12 @@ class _ClientesPageState extends State<ClientesPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Mis Clientes'), elevation: 0),
       body: SafeArea(
-        child: StreamBuilder<List<Cliente>>(
-          stream: getClientes(),
-          builder: (context, asyncSnapshot) {
-            if (asyncSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (asyncSnapshot.hasError) {
-              return _hasError(responsive, theme);
-            } else if (!asyncSnapshot.hasData || asyncSnapshot.data!.isEmpty) {
-              return _sinClientes(responsive, theme);
-            }
-
-            final clientes = asyncSnapshot.data!;
+        // Escucha la caja de clientes: se redibuja sola cuando cambia
+        child: ValueListenableBuilder<Box<Cliente>>(
+          valueListenable: HiveService.clientes.listenable(),
+          builder: (context, box, _) {
+            final clientes = box.values.toList();
+            if (clientes.isEmpty) return _sinClientes(responsive, theme);
             return _hasData(responsive, theme, clientes);
           },
         ),
@@ -57,26 +40,6 @@ class _ClientesPageState extends State<ClientesPage> {
         label: const Text('Nuevo Cliente'),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
-      ),
-    );
-  }
-
-  Widget _hasError(Responsive responsive, ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: responsive.dp(5),
-            color: theme.colorScheme.error,
-          ),
-          SizedBox(height: responsive.hp(2)),
-          Text(
-            'Error al cargar los clientes',
-            style: TextStyle(color: theme.colorScheme.error),
-          ),
-        ],
       ),
     );
   }

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
-import '../../models/itemproducto.dart';
-
-// Ajusta estas rutas a tu proyecto
 import '../../models/pedido.dart';
+import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
 class PedidosPage extends StatefulWidget {
@@ -14,32 +13,6 @@ class PedidosPage extends StatefulWidget {
 }
 
 class _PedidosPageState extends State<PedidosPage> {
-  Future<List<Pedido>> futurePedidos() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return [
-      Pedido(
-        idCliente: '1',
-        nombreCliente: 'Cliente 1',
-        items: [
-          ItemProducto(
-            idProducto: '1',
-            nombreProducto: 'Producto 1',
-            precioUnitario: 135060,
-          ),
-        ],
-        imagen: '',
-        sena: 13506,
-        fechaEntrega: DateTime(2023, 11, 12),
-        fechaEncargo: DateTime.now(),
-        pagoRealizado: false,
-      ),
-    ];
-  }
-
-  Stream<List<Pedido>> getPedidos() async* {
-    yield await futurePedidos();
-  }
-
   @override
   Widget build(BuildContext context) {
     final responsive = Responsive.of(context);
@@ -48,20 +21,16 @@ class _PedidosPageState extends State<PedidosPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Gestión de Pedidos'), elevation: 0),
       body: SafeArea(
-        child: StreamBuilder<List<Pedido>>(
-          stream: getPedidos(),
-          builder: (context, asyncSnapshot) {
-            if (asyncSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (asyncSnapshot.hasError) {
-              return _hasError(responsive, theme);
-            } else if (!asyncSnapshot.hasData || asyncSnapshot.data!.isEmpty) {
+        // Escucha la caja de pedidos: se redibuja sola cuando cambia
+        child: ValueListenableBuilder<Box<Pedido>>(
+          valueListenable: HiveService.pedidos.listenable(),
+          builder: (context, box, _) {
+            final todosLosPedidos = box.values.toList();
+            if (todosLosPedidos.isEmpty) {
               return _sinPedidos(responsive, theme);
             }
 
             // --- LÓGICA DE CATEGORIZACIÓN ---
-            final todosLosPedidos = asyncSnapshot.data!;
-
             final List<Pedido> vencidosImpagos = [];
             final List<Pedido> proximos = [];
             final List<Pedido> pendientes = [];
@@ -158,26 +127,6 @@ class _PedidosPageState extends State<PedidosPage> {
         label: const Text('Nuevo Pedido'),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
-      ),
-    );
-  }
-
-  Widget _hasError(Responsive responsive, ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: responsive.dp(5),
-            color: theme.colorScheme.error,
-          ),
-          SizedBox(height: responsive.hp(2)),
-          Text(
-            'Error al cargar pedidos',
-            style: TextStyle(color: theme.colorScheme.error),
-          ),
-        ],
       ),
     );
   }
