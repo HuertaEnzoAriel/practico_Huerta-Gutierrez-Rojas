@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../utils/responsive.dart';
 
+import '../../models/cliente.dart';
+import '../../services/hive_service.dart';
+
 class NuevoClientePage extends StatefulWidget {
   const NuevoClientePage({super.key});
 
@@ -29,7 +32,13 @@ class _NuevoClientePageState extends State<NuevoClientePage> {
     setState(() => _isLoading = true);
 
     try {
-      //logica de create de Cliente ...
+      // Crea el cliente sin id: el servicio le asigna uno nuevo
+      await HiveService.guardarCliente(
+        Cliente(
+          nombre: _nombreController.text.trim(),
+          telefono: _telefonoController.text.trim(),
+        ),
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -53,7 +62,7 @@ class _NuevoClientePageState extends State<NuevoClientePage> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
+  
   @override
   Widget build(BuildContext context) {
     final responsive = Responsive.of(context);
