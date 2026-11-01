@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../models/producto.dart';
+import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
 class NuevoProductoPage extends StatefulWidget {
@@ -98,7 +100,13 @@ class _NuevoProductoPageState extends State<NuevoProductoPage> {
       final String precioTexto = _precioController.text.replaceAll(',', '.');
       final double precio = double.parse(precioTexto);
 
-      //logica de create de Producto
+      final producto = Producto(
+        nombre: _nombreController.text.trim(),
+        precio: precio,
+        imagen: _imagenSeleccionada!.path,
+      );
+
+      await HiveService.guardarProducto(producto);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

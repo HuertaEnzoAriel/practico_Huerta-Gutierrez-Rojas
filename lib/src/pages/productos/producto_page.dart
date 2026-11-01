@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../components/visorimagen_page.dart';
 import '../../models/producto.dart';
+import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
 class DetalleProductoPage extends StatefulWidget {
@@ -52,7 +53,7 @@ class _DetalleProductoPageState extends State<DetalleProductoPage> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              _ejecutarBorrado(context);
+              _ejecutarBorrado();
             },
             child: const Text('Sí, eliminar'),
           ),
@@ -61,8 +62,20 @@ class _DetalleProductoPageState extends State<DetalleProductoPage> {
     );
   }
 
-  Future<void> _ejecutarBorrado(BuildContext context) async {
-    //logica delete de Producto...
+  Future<void> _ejecutarBorrado() async {
+    final id = _productoActual.id;
+    if (id == null) return;
+
+    await HiveService.borrarProducto(id);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Producto eliminado'),
+        backgroundColor: Colors.green,
+      ),
+    );
+    Navigator.pop(context);
   }
 
   @override
@@ -81,7 +94,7 @@ class _DetalleProductoPageState extends State<DetalleProductoPage> {
             onPressed: () async {
               final productoModificado = await Navigator.pushNamed(
                 context,
-                '/editar-producto',
+                '/editar_producto',
                 arguments: _productoActual,
               );
 
