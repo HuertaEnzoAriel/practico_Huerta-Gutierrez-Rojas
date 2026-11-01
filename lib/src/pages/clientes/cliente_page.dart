@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/cliente.dart';
 import '../../utils/responsive.dart';
 
+import '../../services/hive_service.dart';
+
 class DetalleClientePage extends StatefulWidget {
   final Cliente cliente;
   const DetalleClientePage({super.key, required this.cliente});
@@ -58,16 +60,30 @@ class _DetalleClientePageState extends State<DetalleClientePage> {
   }
 
   Future<void> _ejecutarBorrado() async {
+    // Integridad: no dejar borrar un cliente que tiene pedidos
+    final tienePedidos = HiveService.pedidos.values.any(
+      (p) => p.idCliente == _clienteActual.id,
+    );
+    if (tienePedidos) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se puede eliminar: el cliente tiene pedidos'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
-    //Logica de delete de Cliente ...
+    await HiveService.borrarCliente(_clienteActual.id!);
 
     if (mounted) {
-      Navigator.pop(context);
+      Navigator.pop(context); // cierra el indicador de carga
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -75,7 +91,7 @@ class _DetalleClientePageState extends State<DetalleClientePage> {
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.pop(context);
+      Navigator.pop(context); // vuelve a la lista
     }
   }
 

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../models/cliente.dart';
 import '../../utils/responsive.dart';
 
+import '../../services/hive_service.dart';
+
 class EditarClientePage extends StatefulWidget {
   final Cliente cliente;
   const EditarClientePage({super.key, required this.cliente});
@@ -39,7 +41,13 @@ class _EditarClientePageState extends State<EditarClientePage> {
     setState(() => _isLoading = true);
 
     try {
-      // Logica de Update para Cliente...
+      // Mismo id que el original: put sobrescribe en vez de crear otro
+      final clienteEditado = Cliente(
+        id: widget.cliente.id,
+        nombre: _nombreController.text.trim(),
+        telefono: _telefonoController.text.trim(),
+      );
+      await HiveService.guardarCliente(clienteEditado);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -48,8 +56,8 @@ class _EditarClientePageState extends State<EditarClientePage> {
             backgroundColor: Colors.green,
           ),
         );
-        //Navigator.pop(context, clienteEditado);
-        Navigator.pop(context, widget.cliente);
+        // Devuelve el cliente editado para que el detalle se actualice
+        Navigator.pop(context, clienteEditado);
       }
     } catch (e) {
       if (mounted) {
