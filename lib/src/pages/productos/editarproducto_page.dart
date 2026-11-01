@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../components/visorimagen_page.dart';
 import '../../models/producto.dart';
+import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
 class EditarProductoPage extends StatefulWidget {
@@ -118,7 +119,23 @@ class _EditarProductoPageState extends State<EditarProductoPage> {
       final String precioTexto = _precioController.text.replaceAll(',', '.');
       final double precio = double.parse(precioTexto);
 
-      //Logica de edicion de Producto ...
+      widget.producto.nombre = _nombreController.text.trim();
+      widget.producto.precio = precio;
+      if (_imagenSeleccionada != null) {
+        widget.producto.imagen = _imagenSeleccionada!.path;
+      }
+
+      await HiveService.guardarProducto(widget.producto);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Producto actualizado con éxito'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context, widget.producto);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
