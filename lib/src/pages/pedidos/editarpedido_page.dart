@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:material_ui/material_ui.dart' as mui;
 import 'package:dropdown_search/dropdown_search.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../models/itemproducto.dart';
@@ -10,6 +11,7 @@ import '../../models/pedido.dart';
 import '../../models/cliente.dart';
 import '../../models/producto.dart';
 
+import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
 class EditarPedidoPage extends StatefulWidget {
@@ -25,7 +27,6 @@ class _EditarPedidoPageState extends State<EditarPedidoPage> {
   Cliente? _clienteSeleccionado;
   List<ItemProducto> _items = [];
   bool _isLoading = false;
-  bool _inicializado = false;
 
   late DateTime _fechaEncargo;
   late DateTime _fechaEntrega;
@@ -39,6 +40,11 @@ class _EditarPedidoPageState extends State<EditarPedidoPage> {
   void initState() {
     super.initState();
 
+    // La clave de la caja es el id del cliente
+    _clienteSeleccionado = HiveService.clientes.get(widget.pedido.idCliente);
+
+    // Copiamos los items: Hive devuelve la misma instancia que tiene en memoria,
+    // y sin copia los cambios quedarían aunque el usuario no guarde
     _items = widget.pedido.items
         .map(
           (i) => ItemProducto(
@@ -67,7 +73,8 @@ class _EditarPedidoPageState extends State<EditarPedidoPage> {
   }
 
   double get _totalPedido => _items.fold(0, (sum, item) => sum + item.subtotal);
-  double get _sena => double.tryParse(_senaController.text.trim()) ?? 0.0;
+  double get _sena =>
+      double.tryParse(_senaController.text.trim().replaceAll(',', '.')) ?? 0.0;
   double get _diferencia => _totalPedido - _sena;
 
   void _agregarProducto(Producto producto) {
@@ -180,6 +187,12 @@ class _EditarPedidoPageState extends State<EditarPedidoPage> {
       );
       return;
     }
+    if (_sena < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La seña no puede ser negativa')),
+      );
+      return;
+    }
     if (_sena > _totalPedido) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('La seña no puede superar el total')),
@@ -189,33 +202,45 @@ class _EditarPedidoPageState extends State<EditarPedidoPage> {
 
     setState(() => _isLoading = true);
 
-    // Logica de UPDATE de Pedido
-    if (mounted) {
-      setState(() => _isLoading = false);
+    try {
+      final String imagen = _nuevaImagenFile != null
+          ? await HiveService.guardarImagen(_nuevaImagenFile!)
+          : _imagenActualPath;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cambios guardados con éxito'),
-          backgroundColor: Colors.green,
-        ),
+      // Mismo id que el original: put sobrescribe en vez de crear otro
+      final pedidoEditado = Pedido(
+        id: widget.pedido.id,
+        idCliente: _clienteSeleccionado!.id!,
+        nombreCliente: _clienteSeleccionado!.nombre,
+        items: _items,
+        imagen: imagen,
+        sena: _sena,
+        fechaEntrega: _fechaEntrega,
+        fechaEncargo: _fechaEncargo,
+        // Se recalcula: si se agregaron items, un pedido pagado puede volver a deber
+        pagoRealizado: _sena >= _totalPedido,
       );
-      Navigator.pop(context);
-      //pedidoEditado,
-      //);
+      await HiveService.guardarPedido(pedidoEditado);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cambios guardados con éxito'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Devuelve el pedido editado para que el detalle se actualice
+        Navigator.pop(context, pedidoEditado);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  Future<List<Cliente>> futureClientes() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return [
-      Cliente(id: '1', nombre: 'Cliente 1', telefono: '1111111111'),
-      Cliente(id: '2', nombre: 'Cliente 2', telefono: '1111111111'),
-      Cliente(id: '3', nombre: 'Cliente 3', telefono: '1111111111'),
-    ];
-  }
-
-  Stream<List<Cliente>> getClientes() async* {
-    yield await futureClientes();
   }
 
   @override
@@ -236,62 +261,42 @@ class _EditarPedidoPageState extends State<EditarPedidoPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // 1. SELECCIÓN DE CLIENTE
-                    StreamBuilder<List<Cliente>>(
-                      stream: getClientes(),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const LinearProgressIndicator();
-                        }
-
-                        final clientes = snapshot.data!;
-
-                        if (!_inicializado) {
-                          try {
-                            _clienteSeleccionado = clientes.firstWhere(
-                              (c) => c.id == widget.pedido.idCliente,
-                            );
-                          } catch (_) {}
-                          _inicializado = true;
-                        }
-
-                        return DropdownSearch<Cliente>(
-                          items: (filter, s) => clientes,
-                          compareFn: (item1, item2) => item1.id == item2.id,
-                          selectedItem: _clienteSeleccionado,
-                          // Le decimos al paquete qué atributo del objeto debe mostrar en pantalla
-                          itemAsString: (Cliente c) => c.nombre,
-                          // Qué pasa cuando el usuario elige uno
-                          onSelected: (Cliente? item) {
-                            setState(() {
-                              _clienteSeleccionado = item;
-                            });
-                          },
-                          // Configuración de la ventana de búsqueda (Menú desplegable)
-                          popupProps: PopupProps.menu(
-                            showSearchBox: true,
-                            searchFieldProps: const TextFieldProps(
-                              decoration: mui.InputDecoration(
-                                hintText: "Buscar cliente...",
-                                prefixIcon: Icon(Icons.search),
-                              ),
-                            ),
-                            // Mensaje por si busca un cliente que no existe
-                            emptyBuilder: (context, searchEntry) => Center(
-                              child: Text('No se encontró a "$searchEntry"'),
-                            ),
-                          ),
-                          // Configuración visual del botón principal
-                          decoratorProps: DropDownDecoratorProps(
-                            decoration: mui.InputDecoration(
-                              labelText: 'Cliente seleccionado',
-                              prefixIcon: Icon(
-                                Icons.person_search_rounded,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                        );
+                    DropdownSearch<Cliente>(
+                      items: (filter, s) => HiveService.obtenerClientes(),
+                      compareFn: (item1, item2) => item1.id == item2.id,
+                      selectedItem: _clienteSeleccionado,
+                      // Le decimos al paquete qué atributo del objeto debe mostrar en pantalla
+                      itemAsString: (Cliente c) => c.nombre,
+                      // Qué pasa cuando el usuario elige uno
+                      onSelected: (Cliente? item) {
+                        setState(() {
+                          _clienteSeleccionado = item;
+                        });
                       },
+                      // Configuración de la ventana de búsqueda (Menú desplegable)
+                      popupProps: PopupProps.menu(
+                        showSearchBox: true,
+                        searchFieldProps: const TextFieldProps(
+                          decoration: mui.InputDecoration(
+                            hintText: "Buscar cliente...",
+                            prefixIcon: Icon(Icons.search),
+                          ),
+                        ),
+                        // Mensaje por si busca un cliente que no existe
+                        emptyBuilder: (context, searchEntry) => Center(
+                          child: Text('No se encontró a "$searchEntry"'),
+                        ),
+                      ),
+                      // Configuración visual del botón principal
+                      decoratorProps: DropDownDecoratorProps(
+                        decoration: mui.InputDecoration(
+                          labelText: 'Cliente seleccionado',
+                          prefixIcon: Icon(
+                            Icons.person_search_rounded,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
                     ),
                     SizedBox(height: responsive.hp(2)),
 
@@ -624,24 +629,9 @@ class _EditarPedidoPageState extends State<EditarPedidoPage> {
     );
   }
 
-  Future<List<Producto>> futureProductos() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return [
-      Producto(id: '1', nombre: 'Producto 1', precio: 135060, imagen: ''),
-      Producto(id: '2', nombre: 'Producto 2', precio: 250000, imagen: ''),
-      Producto(id: '3', nombre: 'Producto 3', precio: 5862000, imagen: ''),
-    ];
-  }
-
-  Stream<List<Producto>> getProductos() async* {
-    yield await futureProductos();
-  }
-
   // --- MODAL PARA AGREGAR PRODUCTOS ---
   void _mostrarSelectorProductos(Responsive responsive, ThemeData theme) {
     FocusScope.of(context).unfocus();
-
-    final streamAislado = getProductos();
 
     showModalBottomSheet(
       context: context,
@@ -651,10 +641,11 @@ class _EditarPedidoPageState extends State<EditarPedidoPage> {
         minChildSize: 0.4,
         maxChildSize: 0.9,
         expand: false,
-        builder: (_, controller) => StreamBuilder<List<Producto>>(
-          stream: streamAislado,
-          builder: (context, snapshot) {
-            final productos = snapshot.data ?? [];
+        // Escucha la caja: un producto recién creado aparece solo en la lista
+        builder: (_, controller) => ValueListenableBuilder<Box<Producto>>(
+          valueListenable: HiveService.productos.listenable(),
+          builder: (context, box, _) {
+            final productos = box.values.toList();
             return Column(
               children: [
                 const Padding(
@@ -700,10 +691,8 @@ class _EditarPedidoPageState extends State<EditarPedidoPage> {
                       backgroundColor: theme.colorScheme.primary,
                       foregroundColor: theme.colorScheme.onPrimary,
                     ),
-                    onPressed: () async {
-                      await Navigator.pushNamed(context, '/nuevo_producto');
-                      setState(() {});
-                    },
+                    onPressed: () =>
+                        Navigator.pushNamed(context, '/nuevo_producto'),
                     icon: const Icon(Icons.add_circle_outline),
                     label: const Text(
                       'Crear Nuevo Producto',

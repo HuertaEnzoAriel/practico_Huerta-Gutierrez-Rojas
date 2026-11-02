@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 // Ajusta estas rutas a tu proyecto
 import '../../models/pedido.dart';
 import '../../models/cliente.dart';
+import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
 class DetallePedidoPage extends StatefulWidget {
@@ -19,31 +20,15 @@ class DetallePedidoPage extends StatefulWidget {
 
 class _DetallePedidoPageState extends State<DetallePedidoPage> {
   late Pedido _pedidoActual;
-  Cliente? _clienteCompleto;
-  bool _isLoading = true;
+
+  // Se busca siempre en la caja: sigue siendo correcto si se cambia el cliente
+  Cliente? get _clienteCompleto =>
+      HiveService.clientes.get(_pedidoActual.idCliente);
 
   @override
   void initState() {
     super.initState();
     _pedidoActual = widget.pedido;
-    _cargarDatosCliente();
-  }
-
-  Future<void> _cargarDatosCliente() async {
-    try {
-      // Logica de READ de Cliente
-      setState(() {
-        _clienteCompleto = Cliente(
-          id: '1',
-          nombre: 'Cliente',
-          telefono: '1111111111',
-        );
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      print('Error al cargar cliente: $e');
-    }
   }
 
   // Botón para registrar pagos (totales o parciales)
@@ -126,8 +111,8 @@ class _DetallePedidoPageState extends State<DetallePedidoPage> {
                 }
               });
 
-              // Guardamos en la base de datos (pasamos null en la imagen porque no la estamos editando)
-              // Completar la logica de Update de Pedido
+              // Guardamos en la base de datos: mismo id, put sobrescribe
+              await HiveService.guardarPedido(_pedidoActual);
 
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -173,7 +158,7 @@ class _DetallePedidoPageState extends State<DetallePedidoPage> {
             ),
             onPressed: () async {
               Navigator.pop(ctx); // cierra el alerta
-              //Completar logica de DELETE de Pedido
+              await HiveService.borrarPedido(_pedidoActual.id!);
               if (mounted) {
                 Navigator.pop(context); // Vuelve a la lista
               }
@@ -261,10 +246,6 @@ class _DetallePedidoPageState extends State<DetallePedidoPage> {
   Widget build(BuildContext context) {
     final responsive = Responsive.of(context);
     final theme = Theme.of(context);
-
-    if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
 
     final String fechaEncargo =
         '${_pedidoActual.fechaEncargo.day}/${_pedidoActual.fechaEncargo.month}/${_pedidoActual.fechaEncargo.year}';

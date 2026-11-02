@@ -3,12 +3,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:material_ui/material_ui.dart' as mui;
 import 'package:dropdown_search/dropdown_search.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 // Ajusta estas rutas a tu proyecto
 import '../../models/itemproducto.dart';
 import '../../models/cliente.dart';
+import '../../models/pedido.dart';
 import '../../models/producto.dart';
+import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
 class NuevoPedidoPage extends StatefulWidget {
@@ -48,21 +51,9 @@ class _NuevoPedidoPageState extends State<NuevoPedidoPage> {
 
   // --- CÁLCULOS DINÁMICOS ---
   double get _totalPedido => _items.fold(0, (sum, item) => sum + item.subtotal);
-  double get _sena => double.tryParse(_senaController.text.trim()) ?? 0.0;
+  double get _sena =>
+      double.tryParse(_senaController.text.trim().replaceAll(',', '.')) ?? 0.0;
   double get _diferencia => _totalPedido - _sena;
-
-  Future<List<Cliente>> futureClientes() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return [
-      Cliente(id: '1', nombre: 'Cliente 1', telefono: '1111111111'),
-      Cliente(id: '2', nombre: 'Cliente 2', telefono: '1111111111'),
-      Cliente(id: '3', nombre: 'Cliente 3', telefono: '1111111111'),
-    ];
-  }
-
-  Stream<List<Cliente>> getClientes() async* {
-    yield await futureClientes();
-  }
 
   // --- MÉTODOS DE UI ---
   void _agregarProducto(Producto producto) {
@@ -159,6 +150,12 @@ class _NuevoPedidoPageState extends State<NuevoPedidoPage> {
       );
       return;
     }
+    if (_sena < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La seña no puede ser negativa')),
+      );
+      return;
+    }
     if (_sena > _totalPedido) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('La seña no puede ser mayor al total')),
@@ -168,18 +165,46 @@ class _NuevoPedidoPageState extends State<NuevoPedidoPage> {
 
     setState(() => _isLoading = true);
 
-    //Logica de CREATE Pedido
+    try {
+      final String imagen = _imagenSeleccionada != null
+          ? await HiveService.guardarImagen(_imagenSeleccionada!)
+          : '';
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡Pedido creado con éxito!'),
-          backgroundColor: Colors.green,
+      // Crea el pedido sin id: el servicio le asigna uno nuevo.
+      // Los items se guardan embebidos dentro del pedido
+      await HiveService.guardarPedido(
+        Pedido(
+          idCliente: _clienteSeleccionado!.id!,
+          nombreCliente: _clienteSeleccionado!.nombre,
+          items: _items,
+          imagen: imagen,
+          sena: _sena,
+          fechaEntrega: _fechaEntrega,
+          fechaEncargo: _fechaEncargo,
+          pagoRealizado: _sena >= _totalPedido,
         ),
       );
-      Navigator.pop(context);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡Pedido creado con éxito!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error inesperado: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -232,44 +257,38 @@ class _NuevoPedidoPageState extends State<NuevoPedidoPage> {
   }
 
   Widget _cliente(Responsive responsive, ThemeData theme) {
-    return StreamBuilder<List<Cliente>>(
-      stream: getClientes(),
-      builder: (context, snapshot) {
-        final clientes = snapshot.data ?? [];
-        return DropdownSearch<Cliente>(
-          items: (filter, s) => clientes,
-          compareFn: (item1, item2) => item1.id == item2.id,
-          selectedItem: _clienteSeleccionado,
-          // Le decimos al paquete qué atributo del objeto debe mostrar en pantalla
-          itemAsString: (Cliente c) => c.nombre,
-          onSelected: (Cliente? item) {
-            setState(() {
-              _clienteSeleccionado = item;
-            });
-          },
-          popupProps: PopupProps.menu(
-            showSearchBox: true,
-            searchFieldProps: const TextFieldProps(
-              decoration: mui.InputDecoration(
-                hintText: "Buscar cliente...",
-                prefixIcon: Icon(Icons.search),
-              ),
-            ),
-            emptyBuilder: (context, searchEntry) =>
-                Center(child: Text('No se encontró a "$searchEntry"')),
-          ),
-          // Configuración visual del botón principal
-          decoratorProps: DropDownDecoratorProps(
-            decoration: mui.InputDecoration(
-              labelText: 'Cliente seleccionado',
-              prefixIcon: Icon(
-                Icons.person_search_rounded,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-          ),
-        );
+    return DropdownSearch<Cliente>(
+      items: (filter, s) => HiveService.obtenerClientes(),
+      compareFn: (item1, item2) => item1.id == item2.id,
+      selectedItem: _clienteSeleccionado,
+      // Le decimos al paquete qué atributo del objeto debe mostrar en pantalla
+      itemAsString: (Cliente c) => c.nombre,
+      onSelected: (Cliente? item) {
+        setState(() {
+          _clienteSeleccionado = item;
+        });
       },
+      popupProps: PopupProps.menu(
+        showSearchBox: true,
+        searchFieldProps: const TextFieldProps(
+          decoration: mui.InputDecoration(
+            hintText: "Buscar cliente...",
+            prefixIcon: Icon(Icons.search),
+          ),
+        ),
+        emptyBuilder: (context, searchEntry) =>
+            Center(child: Text('No se encontró a "$searchEntry"')),
+      ),
+      // Configuración visual del botón principal
+      decoratorProps: DropDownDecoratorProps(
+        decoration: mui.InputDecoration(
+          labelText: 'Cliente seleccionado',
+          prefixIcon: Icon(
+            Icons.person_search_rounded,
+            color: theme.colorScheme.primary,
+          ),
+        ),
+      ),
     );
   }
 
@@ -576,24 +595,9 @@ class _NuevoPedidoPageState extends State<NuevoPedidoPage> {
     );
   }
 
-  Future<List<Producto>> futureProductos() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return [
-      Producto(id: '1', nombre: 'Producto 1', precio: 135060, imagen: ''),
-      Producto(id: '2', nombre: 'Producto 2', precio: 250000, imagen: ''),
-      Producto(id: '3', nombre: 'Producto 3', precio: 5862000, imagen: ''),
-    ];
-  }
-
-  Stream<List<Producto>> getProductos() async* {
-    yield await futureProductos();
-  }
-
   // MODAL PARA SELECCIONAR PRODUCTOS
   void _mostrarSelectorProductos(Responsive responsive, ThemeData theme) {
     FocusScope.of(context).unfocus();
-
-    final streamAislado = getProductos();
 
     showModalBottomSheet(
       context: context,
@@ -603,10 +607,11 @@ class _NuevoPedidoPageState extends State<NuevoPedidoPage> {
         minChildSize: 0.4,
         maxChildSize: 0.9,
         expand: false,
-        builder: (_, controller) => StreamBuilder<List<Producto>>(
-          stream: streamAislado,
-          builder: (context, snapshot) {
-            final productos = snapshot.data ?? [];
+        // Escucha la caja: un producto recién creado aparece solo en la lista
+        builder: (_, controller) => ValueListenableBuilder<Box<Producto>>(
+          valueListenable: HiveService.productos.listenable(),
+          builder: (context, box, _) {
+            final productos = box.values.toList();
             return Column(
               children: [
                 const Padding(
@@ -653,10 +658,8 @@ class _NuevoPedidoPageState extends State<NuevoPedidoPage> {
                       backgroundColor: theme.colorScheme.primary,
                       foregroundColor: theme.colorScheme.onPrimary,
                     ),
-                    onPressed: () async {
-                      await Navigator.pushNamed(context, '/nuevo_producto');
-                      setState(() {});
-                    },
+                    onPressed: () =>
+                        Navigator.pushNamed(context, '/nuevo_producto'),
                     icon: const Icon(Icons.add_circle_outline),
                     label: const Text(
                       'Crear Nuevo Producto',
