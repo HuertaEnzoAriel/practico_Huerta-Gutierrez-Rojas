@@ -31,41 +31,4 @@ class Pedido {
   });
 
   double get diferencia => total - sena;
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'idCliente': idCliente,
-      'nombreCliente': nombreCliente,
-      'items': items.map((i) => i.toMap()).toList(),
-      'imagen': imagen,
-      'sena': sena,
-      // Guardamos las fechas como String universal
-      'fechaEntrega': fechaEntrega.toIso8601String(),
-      'fechaEncargo': fechaEncargo.toIso8601String(),
-      'pagoRealizado': pagoRealizado,
-    };
-  }
-
-  factory Pedido.fromMap(Map<String, dynamic> map, {String? documentId}) {
-    return Pedido(
-      id: documentId ?? map['id'],
-      idCliente: map['idCliente'] ?? '',
-      nombreCliente: map['nombreCliente'] ?? '',
-      items:
-          (map['items'] as List?)
-              ?.map((i) => ItemProducto.fromMap(Map<String, dynamic>.from(i)))
-              .toList() ??
-          [],
-      imagen: map['imagen'] ?? '',
-      sena: (map['sena'] ?? 0.0).toDouble(),
-      fechaEntrega: map['fechaEntrega'] != null
-          ? DateTime.parse(map['fechaEntrega'])
-          : DateTime.now(),
-      fechaEncargo: map['fechaEncargo'] != null
-          ? DateTime.parse(map['fechaEncargo'])
-          : DateTime.now(),
-      pagoRealizado: map['pagoRealizado'] ?? false,
-    );
-  }
 }

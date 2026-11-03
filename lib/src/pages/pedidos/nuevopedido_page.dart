@@ -131,6 +131,7 @@ class _NuevoPedidoPageState extends State<NuevoPedidoPage> {
         setState(() => _imagenSeleccionada = File(pickedFile.path));
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error al seleccionar imagen')),
       );
@@ -257,35 +258,39 @@ class _NuevoPedidoPageState extends State<NuevoPedidoPage> {
   }
 
   Widget _cliente(Responsive responsive, ThemeData theme) {
-    return DropdownSearch<Cliente>(
-      items: (filter, s) => HiveService.obtenerClientes(),
-      compareFn: (item1, item2) => item1.id == item2.id,
-      selectedItem: _clienteSeleccionado,
-      // Le decimos al paquete qué atributo del objeto debe mostrar en pantalla
-      itemAsString: (Cliente c) => c.nombre,
-      onSelected: (Cliente? item) {
-        setState(() {
-          _clienteSeleccionado = item;
-        });
-      },
-      popupProps: PopupProps.menu(
-        showSearchBox: true,
-        searchFieldProps: const TextFieldProps(
-          decoration: mui.InputDecoration(
-            hintText: "Buscar cliente...",
-            prefixIcon: Icon(Icons.search),
+    // dropdown_search usa widgets de material_ui, que necesitan su propio Material
+    return mui.Material(
+      type: mui.MaterialType.transparency,
+      child: DropdownSearch<Cliente>(
+        items: (filter, s) => HiveService.obtenerClientes(),
+        compareFn: (item1, item2) => item1.id == item2.id,
+        selectedItem: _clienteSeleccionado,
+        // Le decimos al paquete qué atributo del objeto debe mostrar en pantalla
+        itemAsString: (Cliente c) => c.nombre,
+        onSelected: (Cliente? item) {
+          setState(() {
+            _clienteSeleccionado = item;
+          });
+        },
+        popupProps: PopupProps.menu(
+          showSearchBox: true,
+          searchFieldProps: const TextFieldProps(
+            decoration: mui.InputDecoration(
+              hintText: "Buscar cliente...",
+              prefixIcon: Icon(Icons.search),
+            ),
           ),
+          emptyBuilder: (context, searchEntry) =>
+              Center(child: Text('No se encontró a "$searchEntry"')),
         ),
-        emptyBuilder: (context, searchEntry) =>
-            Center(child: Text('No se encontró a "$searchEntry"')),
-      ),
-      // Configuración visual del botón principal
-      decoratorProps: DropDownDecoratorProps(
-        decoration: mui.InputDecoration(
-          labelText: 'Cliente seleccionado',
-          prefixIcon: Icon(
-            Icons.person_search_rounded,
-            color: theme.colorScheme.primary,
+        // Configuración visual del botón principal
+        decoratorProps: DropDownDecoratorProps(
+          decoration: mui.InputDecoration(
+            labelText: 'Cliente seleccionado',
+            prefixIcon: Icon(
+              Icons.person_search_rounded,
+              color: theme.colorScheme.primary,
+            ),
           ),
         ),
       ),

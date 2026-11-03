@@ -6,14 +6,9 @@ import '../../models/producto.dart';
 import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
-class ProductosPage extends StatefulWidget {
+class ProductosPage extends StatelessWidget {
   const ProductosPage({super.key});
 
-  @override
-  State<ProductosPage> createState() => _ProductosPageState();
-}
-
-class _ProductosPageState extends State<ProductosPage> {
   @override
   Widget build(BuildContext context) {
     final responsive = Responsive.of(context);
@@ -79,11 +74,7 @@ class _ProductosPageState extends State<ProductosPage> {
               itemCount: productos.length,
               itemBuilder: (context, index) {
                 final producto = productos[index];
-                return _ProductoCard(
-                  producto: producto,
-                  responsive: responsive,
-                  alVolver: () => setState(() {}),
-                );
+                return _ProductoCard(producto: producto, responsive: responsive);
               },
             ),
           ),
@@ -96,13 +87,8 @@ class _ProductosPageState extends State<ProductosPage> {
 class _ProductoCard extends StatelessWidget {
   final Producto producto;
   final Responsive responsive;
-  final VoidCallback alVolver;
 
-  const _ProductoCard({
-    required this.producto,
-    required this.responsive,
-    required this.alVolver,
-  });
+  const _ProductoCard({required this.producto, required this.responsive});
 
   @override
   Widget build(BuildContext context) {
@@ -115,10 +101,8 @@ class _ProductoCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(responsive.dp(1.5)),
-        onTap: () async {
-          await Navigator.pushNamed(context, '/producto', arguments: producto);
-          alVolver();
-        },
+        onTap: () =>
+            Navigator.pushNamed(context, '/producto', arguments: producto),
         child: Padding(
           padding: EdgeInsets.all(responsive.wp(2)),
           child: Column(

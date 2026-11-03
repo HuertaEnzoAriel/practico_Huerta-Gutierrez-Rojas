@@ -21,5 +21,5 @@ Future<void> main() async {
   await Hive.openBox<Producto>('productos');
   await Hive.openBox<Pedido>('pedidos');
 
-  runApp(DimeelprecioApp());
+  runApp(const DimeelprecioApp());
 }

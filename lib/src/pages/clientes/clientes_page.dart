@@ -5,14 +5,9 @@ import '../../models/cliente.dart';
 import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
-class ClientesPage extends StatefulWidget {
+class ClientesPage extends StatelessWidget {
   const ClientesPage({super.key});
 
-  @override
-  State<ClientesPage> createState() => _ClientesPageState();
-}
-
-class _ClientesPageState extends State<ClientesPage> {
   @override
   Widget build(BuildContext context) {
     final responsive = Responsive.of(context);
@@ -32,10 +27,7 @@ class _ClientesPageState extends State<ClientesPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.pushNamed(context, '/nuevo_cliente');
-          if (mounted) setState(() {});
-        },
+        onPressed: () => Navigator.pushNamed(context, '/nuevo_cliente'),
         icon: const Icon(Icons.person_add_alt_1_rounded),
         label: const Text('Nuevo Cliente'),
         backgroundColor: theme.colorScheme.primary,
@@ -95,11 +87,7 @@ class _ClientesPageState extends State<ClientesPage> {
               itemCount: clientes.length,
               itemBuilder: (context, index) {
                 final cliente = clientes[index];
-                return _ClienteTile(
-                  cliente: cliente,
-                  responsive: responsive,
-                  alVolver: () => setState(() {}),
-                );
+                return _ClienteTile(cliente: cliente, responsive: responsive);
               },
             ),
           ),
@@ -113,13 +101,8 @@ class _ClientesPageState extends State<ClientesPage> {
 class _ClienteTile extends StatelessWidget {
   final Cliente cliente;
   final Responsive responsive;
-  final VoidCallback alVolver;
 
-  const _ClienteTile({
-    required this.cliente,
-    required this.responsive,
-    required this.alVolver,
-  });
+  const _ClienteTile({required this.cliente, required this.responsive});
 
   @override
   Widget build(BuildContext context) {
@@ -137,10 +120,8 @@ class _ClienteTile extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(responsive.dp(1.5)),
-        onTap: () async {
-          await Navigator.pushNamed(context, '/cliente', arguments: cliente);
-          alVolver();
-        },
+        onTap: () =>
+            Navigator.pushNamed(context, '/cliente', arguments: cliente),
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: responsive.hp(0.5)),
           child: ListTile(

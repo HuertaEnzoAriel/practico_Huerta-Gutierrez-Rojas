@@ -23,6 +23,13 @@ class HiveService {
     return copia.path;
   }
 
+  // Borra la copia permanente de una imagen; ignora rutas vacías o inexistentes
+  static Future<void> borrarImagen(String ruta) async {
+    if (ruta.isEmpty) return;
+    final archivo = File(ruta);
+    if (await archivo.exists()) await archivo.delete();
+  }
+
   // ---------- CLIENTES ----------
   static List<Cliente> obtenerClientes() => clientes.values.toList();
 
@@ -60,5 +67,9 @@ class HiveService {
     await pedidos.put(p.id, p);
   }
 
-  static Future<void> borrarPedido(String id) => pedidos.delete(id);
+  static Future<void> borrarPedido(String id) async {
+    final imagen = pedidos.get(id)?.imagen ?? '';
+    await pedidos.delete(id);
+    await borrarImagen(imagen); // la foto del pedido ya no se usa
+  }
 }

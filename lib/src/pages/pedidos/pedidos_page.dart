@@ -5,14 +5,9 @@ import '../../models/pedido.dart';
 import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
-class PedidosPage extends StatefulWidget {
+class PedidosPage extends StatelessWidget {
   const PedidosPage({super.key});
 
-  @override
-  State<PedidosPage> createState() => _PedidosPageState();
-}
-
-class _PedidosPageState extends State<PedidosPage> {
   @override
   Widget build(BuildContext context) {
     final responsive = Responsive.of(context);
@@ -86,7 +81,6 @@ class _PedidosPageState extends State<PedidosPage> {
                   color: Colors.red.shade700,
                   pedidos: vencidosImpagos,
                   responsive: responsive,
-                  alVolver: () => setState(() {}),
                 ),
                 _SeccionPedidos(
                   titulo: 'Próximos a Entregar',
@@ -94,7 +88,6 @@ class _PedidosPageState extends State<PedidosPage> {
                   color: Colors.orange.shade700,
                   pedidos: proximos,
                   responsive: responsive,
-                  alVolver: () => setState(() {}),
                 ),
                 _SeccionPedidos(
                   titulo: 'Pedidos Pendientes',
@@ -102,7 +95,6 @@ class _PedidosPageState extends State<PedidosPage> {
                   color: theme.colorScheme.primary,
                   pedidos: pendientes,
                   responsive: responsive,
-                  alVolver: () => setState(() {}),
                 ),
                 _SeccionPedidos(
                   titulo: 'Historial Completado',
@@ -110,7 +102,6 @@ class _PedidosPageState extends State<PedidosPage> {
                   color: Colors.green.shade700,
                   pedidos: historial,
                   responsive: responsive,
-                  alVolver: () => setState(() {}),
                 ),
                 SizedBox(height: responsive.hp(8)),
               ],
@@ -119,10 +110,7 @@ class _PedidosPageState extends State<PedidosPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.pushNamed(context, '/nuevo_pedido');
-          if (mounted) setState(() {});
-        },
+        onPressed: () => Navigator.pushNamed(context, '/nuevo_pedido'),
         icon: const Icon(Icons.add_task_rounded),
         label: const Text('Nuevo Pedido'),
         backgroundColor: theme.colorScheme.primary,
@@ -161,7 +149,6 @@ class _SeccionPedidos extends StatelessWidget {
   final Color color;
   final List<Pedido> pedidos;
   final Responsive responsive;
-  final VoidCallback alVolver;
 
   const _SeccionPedidos({
     required this.titulo,
@@ -169,7 +156,6 @@ class _SeccionPedidos extends StatelessWidget {
     required this.color,
     required this.pedidos,
     required this.responsive,
-    required this.alVolver,
   });
 
   @override
@@ -226,8 +212,7 @@ class _SeccionPedidos extends StatelessWidget {
   }
 
   Iterable<_PedidoTile> _pedidos() => pedidos.map(
-    (pedido) =>
-        _PedidoTile(pedido: pedido, responsive: responsive, alVolver: alVolver),
+    (pedido) => _PedidoTile(pedido: pedido, responsive: responsive),
   );
 }
 
@@ -235,13 +220,8 @@ class _SeccionPedidos extends StatelessWidget {
 class _PedidoTile extends StatelessWidget {
   final Pedido pedido;
   final Responsive responsive;
-  final VoidCallback alVolver;
 
-  const _PedidoTile({
-    required this.pedido,
-    required this.responsive,
-    required this.alVolver,
-  });
+  const _PedidoTile({required this.pedido, required this.responsive});
 
   @override
   Widget build(BuildContext context) {
@@ -263,10 +243,8 @@ class _PedidoTile extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(responsive.dp(1.5)),
-        onTap: () async {
-          await Navigator.pushNamed(context, '/pedido', arguments: pedido);
-          alVolver();
-        },
+        onTap: () =>
+            Navigator.pushNamed(context, '/pedido', arguments: pedido),
         child: Padding(
           padding: EdgeInsets.all(responsive.wp(3)),
           child: Column(

@@ -103,7 +103,7 @@ class _NuevoProductoPageState extends State<NuevoProductoPage> {
       final producto = Producto(
         nombre: _nombreController.text.trim(),
         precio: precio,
-        imagen: _imagenSeleccionada!.path,
+        imagen: await HiveService.guardarImagen(_imagenSeleccionada!),
       );
 
       await HiveService.guardarProducto(producto);

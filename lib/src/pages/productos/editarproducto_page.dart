@@ -121,8 +121,11 @@ class _EditarProductoPageState extends State<EditarProductoPage> {
 
       widget.producto.nombre = _nombreController.text.trim();
       widget.producto.precio = precio;
-      if (_imagenSeleccionada != null) {
-        widget.producto.imagen = _imagenSeleccionada!.path;
+      if (_imagenSeleccionada != null &&
+          _imagenSeleccionada!.path != widget.producto.imagen) {
+        widget.producto.imagen = await HiveService.guardarImagen(
+          _imagenSeleccionada!,
+        );
       }
 
       await HiveService.guardarProducto(widget.producto);

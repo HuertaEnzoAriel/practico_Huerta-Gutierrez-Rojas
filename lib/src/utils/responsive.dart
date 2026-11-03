@@ -9,8 +9,7 @@ class Responsive {
   //Al ser privadas las propiedades de las dimensiones, se debe //establecer los respectivos get para acceder a dichos valores
   double get width => _width;
   double get height => _height;
-  double get diagonal =>
-      _diagonal; //Función estática que retorna una instancia de la clase responsive
+  double get diagonal => _diagonal; //Función estática que retorna una instancia de la clase responsive
   bool get isTablet => _isTablet;
   Responsive? instance;
 
