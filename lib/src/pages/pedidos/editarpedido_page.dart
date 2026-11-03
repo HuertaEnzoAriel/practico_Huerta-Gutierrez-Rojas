@@ -96,11 +96,21 @@ class _EditarPedidoPageState extends State<EditarPedidoPage> {
   }
 
   Future<void> _seleccionarFecha(bool esEntrega) async {
+    // La entrega no puede ser anterior al día del encargo
+    final DateTime encargoDia = DateTime(
+      _fechaEncargo.year,
+      _fechaEncargo.month,
+      _fechaEncargo.day,
+    );
+    final DateTime firstDate = esEntrega ? encargoDia : DateTime(2020);
+    final DateTime inicial = esEntrega ? _fechaEntrega : _fechaEncargo;
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: esEntrega ? _fechaEntrega : _fechaEncargo,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
+      // initialDate no puede quedar fuera del rango permitido
+      initialDate: inicial.isBefore(firstDate) ? firstDate : inicial,
+      firstDate: firstDate,
+      lastDate: DateTime(DateTime.now().year + 5),
     );
     if (picked != null) {
       setState(() {

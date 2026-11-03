@@ -9,6 +9,90 @@ import '../../models/cliente.dart';
 import '../../services/hive_service.dart';
 import '../../utils/responsive.dart';
 
+// Diálogo para ingresar un pago; devuelve el monto o null si se cancela
+class _DialogoPago extends StatefulWidget {
+  final double deuda;
+
+  const _DialogoPago({required this.deuda});
+
+  @override
+  State<_DialogoPago> createState() => _DialogoPagoState();
+}
+
+class _DialogoPagoState extends State<_DialogoPago> {
+  late final TextEditingController _pagoController;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Por comodidad, pre-llenamos el campo con la deuda restante
+    _pagoController = TextEditingController(
+      text: widget.deuda.toStringAsFixed(2),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pagoController.dispose();
+    super.dispose();
+  }
+
+  void _confirmar() {
+    final monto =
+        double.tryParse(_pagoController.text.replaceAll(',', '.')) ?? 0.0;
+
+    if (monto <= 0) {
+      setState(() => _error = 'Ingresa un monto válido mayor a 0');
+      return;
+    }
+    if (monto > widget.deuda) {
+      setState(() => _error = 'El monto no puede superar la deuda actual');
+      return;
+    }
+    Navigator.pop(context, monto);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Registrar Pago'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Resta pagar: \$${widget.deuda.toStringAsFixed(2)}'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _pagoController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Monto a ingresar',
+              prefixText: '\$ ',
+              border: const OutlineInputBorder(),
+              errorText: _error,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: _confirmar,
+          child: const Text('Confirmar Pago'),
+        ),
+      ],
+    );
+  }
+}
+
 class DetallePedidoPage extends StatefulWidget {
   final Pedido pedido;
 
@@ -33,104 +117,37 @@ class _DetallePedidoPageState extends State<DetallePedidoPage> {
 
   // Botón para registrar pagos (totales o parciales)
   Future<void> _registrarPago() async {
-    final TextEditingController pagoController = TextEditingController();
-
-    // Por comodidad, pre-llenamos el campo con la deuda restante
-    pagoController.text = _pedidoActual.diferencia.toStringAsFixed(2);
-
-    showDialog(
+    // El diálogo es un widget aparte para que él mismo libere su controller
+    final double? montoIngresado = await showDialog<double>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Registrar Pago'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Resta pagar: \$${_pedidoActual.diferencia.toStringAsFixed(2)}',
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: pagoController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(
-                labelText: 'Monto a ingresar',
-                prefixText: '\$ ',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              // Capturamos y limpiamos el monto
-              final montoIngresado =
-                  double.tryParse(pagoController.text.replaceAll(',', '.')) ??
-                  0.0;
-
-              // Validaciones de negocio
-              if (montoIngresado <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Ingresa un monto válido mayor a 0'),
-                  ),
-                );
-                return;
-              }
-
-              if (montoIngresado > _pedidoActual.diferencia) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('El monto no puede superar la deuda actual'),
-                  ),
-                );
-                return;
-              }
-
-              Navigator.pop(ctx);
-
-              // 3. Actualizamos el estado
-              setState(() {
-                // Le sumamos el nuevo pago a la seña que ya existía
-                _pedidoActual.sena += montoIngresado;
-
-                // Si con este pago la diferencia llega a 0, marcamos el flag de finalizado
-                if (_pedidoActual.diferencia <= 0) {
-                  _pedidoActual.pagoRealizado = true;
-                }
-              });
-
-              // Guardamos en la base de datos: mismo id, put sobrescribe
-              await HiveService.guardarPedido(_pedidoActual);
-
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Pago registrado con éxito',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              }
-            },
-            child: const Text('Confirmar Pago'),
-          ),
-        ],
-      ),
+      builder: (ctx) => _DialogoPago(deuda: _pedidoActual.diferencia),
     );
+    if (montoIngresado == null || !mounted) return;
+
+    setState(() {
+      // Le sumamos el nuevo pago a la seña que ya existía
+      _pedidoActual.sena += montoIngresado;
+
+      // Si con este pago la diferencia llega a 0, marcamos el flag de finalizado
+      if (_pedidoActual.diferencia <= 0) {
+        _pedidoActual.pagoRealizado = true;
+      }
+    });
+
+    // Guardamos en la base de datos: mismo id, put sobrescribe
+    await HiveService.guardarPedido(_pedidoActual);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Pago registrado con éxito',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   // Eliminar Pedido
@@ -253,11 +270,20 @@ class _DetallePedidoPageState extends State<DetallePedidoPage> {
         '${_pedidoActual.fechaEntrega.day}/${_pedidoActual.fechaEntrega.month}/${_pedidoActual.fechaEntrega.year}';
     final bool estaPagado =
         _pedidoActual.pagoRealizado || _pedidoActual.diferencia <= 0;
+    // Se compara por día: el mismo día de la entrega todavía no cuenta como pasada
+    final DateTime ahora = DateTime.now();
+    final bool entregaPasada = DateTime(
+      _pedidoActual.fechaEntrega.year,
+      _pedidoActual.fechaEntrega.month,
+      _pedidoActual.fechaEntrega.day,
+    ).isBefore(DateTime(ahora.year, ahora.month, ahora.day));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Detalle de Pedido'),
-        actions: DateTime.now().isBefore(_pedidoActual.fechaEntrega)
+        // Solo se bloquea un pedido ya entregado y pagado; un pedido vencido
+        // con deuda sigue pudiéndose editar o eliminar
+        actions: !(entregaPasada && estaPagado)
             ? [
                 IconButton(
                   icon: const Icon(Icons.edit_note_rounded),

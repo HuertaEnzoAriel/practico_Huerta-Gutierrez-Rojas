@@ -79,7 +79,7 @@ class _NuevoPedidoPageState extends State<NuevoPedidoPage> {
       context: context,
       initialDate: _fechaEntrega,
       firstDate: DateTime.now(), // No se puede entregar en el pasado
-      lastDate: DateTime(2030),
+      lastDate: DateTime(DateTime.now().year + 5),
     );
     if (picked != null && picked != _fechaEntrega) {
       setState(() => _fechaEntrega = picked);
