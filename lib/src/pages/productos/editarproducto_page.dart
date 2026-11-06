@@ -115,20 +115,36 @@ class _EditarProductoPageState extends State<EditarProductoPage> {
 
     setState(() => _isLoading = true);
 
+    final imagenAnterior = widget.producto.imagen;
+    String? imagenNueva;
+    var guardado = false;
+
     try {
       final String precioTexto = _precioController.text.replaceAll(',', '.');
       final double precio = double.parse(precioTexto);
 
-      widget.producto.nombre = _nombreController.text.trim();
-      widget.producto.precio = precio;
+      // Solo copiamos la imagen si el usuario eligió una distinta a la actual
       if (_imagenSeleccionada != null &&
-          _imagenSeleccionada!.path != widget.producto.imagen) {
-        widget.producto.imagen = await HiveService.guardarImagen(
-          _imagenSeleccionada!,
-        );
+          _imagenSeleccionada!.path != imagenAnterior) {
+        imagenNueva = await HiveService.guardarImagen(_imagenSeleccionada!);
       }
 
-      await HiveService.guardarProducto(widget.producto);
+      // Armamos un producto nuevo para no dejar el original a medio modificar
+      // si el guardado falla.
+      final productoEditado = Producto(
+        id: widget.producto.id,
+        nombre: _nombreController.text.trim(),
+        precio: precio,
+        imagen: imagenNueva ?? imagenAnterior,
+      );
+
+      await HiveService.guardarProducto(productoEditado);
+      guardado = true;
+
+      // La foto anterior quedó huérfana si se reemplazó
+      if (imagenNueva != null) {
+        await HiveService.borrarImagen(imagenAnterior);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -137,9 +153,13 @@ class _EditarProductoPageState extends State<EditarProductoPage> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, widget.producto);
+        Navigator.pop(context, productoEditado);
       }
     } catch (e) {
+      // Si falló el guardado, la copia nueva no quedó asociada a ningún producto
+      if (!guardado && imagenNueva != null) {
+        await HiveService.borrarImagen(imagenNueva);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),

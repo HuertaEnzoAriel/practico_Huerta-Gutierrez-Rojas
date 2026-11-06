@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -23,11 +24,16 @@ class HiveService {
     return copia.path;
   }
 
-  // Borra la copia permanente de una imagen; ignora rutas vacías o inexistentes
+  // Borra la copia permanente de una imagen; ignora rutas vacías o inexistentes.
+  // Es una limpieza best-effort: si falla, no debe romper la operación principal.
   static Future<void> borrarImagen(String ruta) async {
     if (ruta.isEmpty) return;
-    final archivo = File(ruta);
-    if (await archivo.exists()) await archivo.delete();
+    try {
+      final archivo = File(ruta);
+      if (await archivo.exists()) await archivo.delete();
+    } catch (e) {
+      debugPrint('No se pudo borrar la imagen $ruta: $e');
+    }
   }
 
   // ---------- CLIENTES ----------
@@ -57,7 +63,11 @@ class HiveService {
     await productos.put(p.id, p);
   }
 
-  static Future<void> borrarProducto(String id) => productos.delete(id);
+  static Future<void> borrarProducto(String id) async {
+    final imagen = productos.get(id)?.imagen ?? '';
+    await productos.delete(id);
+    await borrarImagen(imagen); // la foto del producto ya no se usa
+  }
 
   // ---------- PEDIDOS ----------
   static List<Pedido> obtenerPedidos() => pedidos.values.toList();

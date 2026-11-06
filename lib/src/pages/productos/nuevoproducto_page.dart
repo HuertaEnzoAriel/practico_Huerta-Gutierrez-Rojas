@@ -96,17 +96,24 @@ class _NuevoProductoPageState extends State<NuevoProductoPage> {
 
     setState(() => _isLoading = true);
 
+    String? rutaImagen;
+
     try {
       final String precioTexto = _precioController.text.replaceAll(',', '.');
       final double precio = double.parse(precioTexto);
 
+      rutaImagen = await HiveService.guardarImagen(_imagenSeleccionada!);
+
       final producto = Producto(
         nombre: _nombreController.text.trim(),
         precio: precio,
-        imagen: await HiveService.guardarImagen(_imagenSeleccionada!),
+        imagen: rutaImagen,
       );
 
       await HiveService.guardarProducto(producto);
+
+      // La imagen ya quedó asociada al producto: no hay que borrarla
+      rutaImagen = null;
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -118,6 +125,10 @@ class _NuevoProductoPageState extends State<NuevoProductoPage> {
         Navigator.pop(context);
       }
     } catch (e) {
+      // Si falló el guardado, la copia quedó sin producto: la borramos
+      if (rutaImagen != null) {
+        await HiveService.borrarImagen(rutaImagen);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
